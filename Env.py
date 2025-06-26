@@ -1,5 +1,6 @@
 import numpy as np 
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot  as plt  
+from matplotlib.colors import  ListedColormap  
 
 
 class SnakeEnv:
@@ -46,7 +47,11 @@ class SnakeEnv:
         self.Snake = []
 
     def show(self):
-        plt.imshow(self.Map)
+        colors = ['black', 'orange','purple']  
+
+        cmap = ListedColormap(colors)
+
+        plt.imshow(self.Map, cmap=cmap)
         plt.show()
 
 Env = SnakeEnv(9,14)
