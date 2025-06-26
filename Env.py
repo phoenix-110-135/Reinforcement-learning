@@ -11,6 +11,10 @@ class SnakeEnv:
                             'Food':2,
                             'Head':3,
                             'Out':4}
+        
+        self.Reset()
+
+
     def Reset(self):
         self.Map = np.zeros((self.H,self.W),dtype=np.int8)
         self.ResetFood()
@@ -44,3 +48,8 @@ class SnakeEnv:
     def show(self):
         plt.imshow(self.Map)
         plt.show()
+
+Env = SnakeEnv(9,14)
+Env.show()
+
+print("end")
