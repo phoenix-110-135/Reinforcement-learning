@@ -6,5 +6,36 @@ class SnakeEnv:
     def __init__(self, H:int, W:int):
         self.H  = H
         self.W = W
+        self.object2code = {'Free':0,
+                            'Snake':1,
+                            'Food':2,
+                            'Head':3,
+                            'Out':4}
     def Reset(self):
-        self.Map = np.zeros((self.H,self.W),dtype=np.int32)
+        self.Map = np.zeros((self.H,self.W),dtype=np.int8)
+        self.ResetFood()
+
+    def ResetFood(self):
+        m = self.Map == self.object2code['Food']
+        self.Map[m] = self.object2code['Free']
+        h = np.random.randint(low=0, high=self.H)
+        w = np.random.randint(low=0, high=self.W)
+        while self.Map[h,w] != self.object2code['Free']:
+            h = np.random.randint(low=0, high=self.H)
+            w = np.random.randint(low=0, high=self.W)
+        self.Map[h,w] = self.object2code['Food']
+        self.Food = np.array([w,h])
+
+    def ResetSnake(self):
+        m1 = self.Map == self.object2code['Snake']
+        m2 = self.Map == self.object2code['Head']
+        self.Map[m1] = self.object2code['Free']
+        self.Map[m2] = self.object2code['Free']
+        h = np.random.randint(low=0, high=self.H)
+        w = np.random.randint(low=0, high=self.W)
+        while self.Map[h,w] != self.object2code['Free']:
+            h = np.random.randint(low=0, high=self.H)
+            w = np.random.randint(low=0, high=self.W)
+        self.Map[h,w] = self.object2code['Head']
+        self.Head = np.array([w,h])
+        self.Snake = []
