@@ -47,7 +47,7 @@ class SnakeEnv:
         self.Snake = []
 
     def show(self):
-        colors = ['black', 'orange','purple']  
+        colors = ['black', 'orange','yellow','purple']  
 
         cmap = ListedColormap(colors)
 
