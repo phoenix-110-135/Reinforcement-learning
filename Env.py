@@ -12,7 +12,16 @@ class SnakeEnv:
                             'Food':2,
                             'Head':3,
                             'Out':4}
-        self.nAction = 4,
+        self.Action2Code = {'Up':0,
+                            'Right':1,
+                            'Down':2,
+                            'Left':3}
+        self.Action2Trans = {"Up":np.array([-1,0]),
+                             "Right":np.array([0,+1]),
+                             "Down":np.array([+1,0]),
+                             "Left":np.array([0,-1])}
+        
+        self.nAction = len(self.Action2Code)
         self.Reset()
 
 

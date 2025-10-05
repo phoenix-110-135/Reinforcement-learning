@@ -10,10 +10,16 @@ import keras.losses as los
 import Env as env 
 class SnakeAgent:
     def __init__(self,
+                 Hv:int,
+                 Wv:int,
                  Env:env.Env,
                  nEpsilon:int=100,
                  Epsilon1:float=0.99,
                  Epsilon2:float=0.01):
+        self.Hv = Hv
+        self.Wv = Wv
+        self.sState = 4 * ((2 * Hv + 1) * (2 * Wv + 1) -1) + 2 + 2 
+        self.InputShape = (self.sState,)
         self.Env = Env 
         self.nEpsilon = nEpsilon
         self.Epsilon1 = Epsilon1
@@ -27,6 +33,7 @@ class SnakeAgent:
         self.nDense = nDense
         self.Activation = getattr(act,Activation)
         self.Model = mod.Sequential()
+        self.Model.add(lay.InputLayer(input_tensor=self.InputShape))
         for i in nDense:
             self.Model.add(lay.Dense(units=i,activation=self.Activation))
-        self.Model.add(lay.Dense(units=))
+        self.Model.add(lay.Dense(units=self.Env.nAction, activation=getattr(act,'linear')))
