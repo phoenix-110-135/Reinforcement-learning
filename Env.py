@@ -12,7 +12,7 @@ class SnakeEnv:
                             'Food':2,
                             'Head':3,
                             'Out':4}
-        
+        self.nAction = 4,
         self.Reset()
 
 
