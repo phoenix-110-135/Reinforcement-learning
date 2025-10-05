@@ -12,10 +12,12 @@ class SnakeAgent:
     def __init__(self,
                  Hv:int,
                  Wv:int,
-                 Env:env.Env,
+                 Env:env.SnakeEnv,
                  nEpsilon:int=100,
                  Epsilon1:float=0.99,
-                 Epsilon2:float=0.01):
+                 Epsilon2:float=0.01,
+                 LR:float=1e-3):
+        self.LR =LR
         self.Hv = Hv
         self.Wv = Wv
         self.sState = 4 * ((2 * Hv + 1) * (2 * Wv + 1) -1) + 2 + 2 
@@ -37,3 +39,30 @@ class SnakeAgent:
         for i in nDense:
             self.Model.add(lay.Dense(units=i,activation=self.Activation))
         self.Model.add(lay.Dense(units=self.Env.nAction, activation=getattr(act,'linear')))
+    
+    def CompileModel(self,
+                     Optimizer:str='Adam',
+                     Loss:str='MSE'):
+        Optimizer = Optimizer.lower()
+        Loss = Loss.lower()
+        if Optimizer == 'adam':
+            self.Optimizer = opt.Adam(learning_rate=self.LR)
+        elif Optimizer == 'sgd':
+            self.Optimizer = opt.SGD(learning_rate=self.LR,
+                                     momentum=0.9)
+        elif Optimizer == 'rmsprop':
+            self.Optimizer = opt.RMSprop(learning_rate=self.LR)
+        elif Loss in ['mse','mean squared error','mean_squared_error']:
+            self.Loss = los.MeanSquaredError()
+        elif Loss in ['mae','mean absolute error','mean_absolute_error']:
+            self.Loss = los.MeanAbsoluteError()
+        elif Loss in 'huber':
+            self.Loss = los.Huber()
+        self.Model.compile(optimizer=self.Optimizer,
+                           loss=self.Loss)
+    
+    def SummaryModel(self):
+        print(60 * '_')
+        print('Model Summary')
+        self.Model.summary()
+        print(60 * '_')
