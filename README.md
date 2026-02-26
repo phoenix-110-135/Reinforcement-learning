@@ -135,9 +135,8 @@ This plot shows **reward per action** during early training.
 - Random exploration dominates  
 - Unstable Q-value estimates  
 
-```markdown
+
 ![Agent Action Reward 400](Figure_2.png)
-```
 
 ---
 
@@ -152,9 +151,7 @@ This plot shows **total reward per episode** after extended training.
 - Improved food-seeking behavior  
 - Reduced collision frequency  
 
-```markdown
 ![Agent Episode Reward 35000](Figure_1.png)
-```
 
 ---
 
