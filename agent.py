@@ -9,48 +9,82 @@ import keras.losses as los
 import keras.optimizers as opt
 import keras.activations as act
 import matplotlib.pyplot as plt
+
 class SnakeAgent:
     def __init__(self,
+                 Env:env.SnakeEnv,
                  Hv:int,
                  Wv:int,
-                 Env:env.SnakeEnv,
-                 nEpsilon:int=100,
-                 Epsilon1:float=0.99,
+                 nEpisode:int=100,
+                 mStep:int=128,
+                 Epsilon1:float=0.99, 
                  Epsilon2:float=0.01,
+                 Temperature1:float=10,
+                 Temperature2:float=0.1,
                  LR:float=1e-3,
+                 Gamma:float=0.95,
+                 sMemory:int=1024,
+                 sBatch:int=64,
+                 TrainOn:int=32,
                  Save:bool=True,
-                 Load:bool=True):
-        self.LR =LR
+                 Load:bool=True,
+                 trShow:bool=True,
+                 teShow:bool=True):
+        self.Env = Env
         self.Hv = Hv
         self.Wv = Wv
-        self.sState = 4 * ((2 * Hv + 1) * (2 * Wv + 1) -1) + 2 + 2 
-        self.InputShape = (self.sState,)
-        self.Env = Env 
-        self.nEpsilon = nEpsilon
+        self.sState = 4 * ((2 * Hv + 1) * (2 * Wv + 1) - 1) + 2 + 2
+        self.InputShape = (self.sState, )
+        self.nEpisode = nEpisode
+        self.mStep = mStep
         self.Epsilon1 = Epsilon1
         self.Epsilon2 = Epsilon2
         self.Epsilons = np.linspace(start=Epsilon1,
                                     stop=Epsilon2,
-                                    num=nEpsilon)
-        
+                                    num=nEpisode)
+        self.Temperature1 = Temperature1
+        self.Temperature2 = Temperature2
+        self.Temperatures = np.logspace(start=np.log(Temperature1),
+                                        stop=np.log(Temperature2),
+                                        num=nEpisode,
+                                        base=np.e)
         self.LR = LR
+        self.Gamma = Gamma
+        self.sMemory = sMemory
+        self.Memory = col.deque([], maxlen=sMemory)
+        self.sBatch = sBatch
+        self.TrainOn = TrainOn
+        self.Counter = 0
         self.Save = Save
-        self.Load =Load
-
+        self.Load = Load
+        self.trShow = trShow
+        self.teShow = teShow
+        self.Episode = -1
+        self.Step = -1
+        self.MinReward = min(list(Env.Rewards.values()))
+        self.MaxReward = max(list(Env.Rewards.values()))
+        self.MinQ = 1.2 * self.MinReward * (1 + self.Gamma)
+        self.MaxQ = 1.2 * self.MaxReward * (1 + self.Gamma)
+        self.ActionLog = []
+        self.EpisodeLog = np.zeros(shape=(nEpisode, ))
+        self.Training = False
+        self.SaveOn = 4
+        self.SaveOnCounter = 0
     def CreateModel(self,
-                    nDense:list=[512,256],
-                    Activation:str="gelu"):
+                    nDense:list=[512, 256],
+                    Activation:str='gelu'):
         self.nDense = nDense
-        self.Activation = getattr(act,Activation)
+        self.Activation = getattr(act, Activation)
         if os.path.exists('Model') and self.Load:
-            self.Model = mod.load_model('Model')
+            self.Model = mod.load_model('Model.keras')
         else:
             self.Model = mod.Sequential()
-            self.Model.add(lay.InputLayer(input_tensor=self.InputShape))
+            self.Model.add(lay.InputLayer(input_shape=self.InputShape))
             for i in nDense:
-                self.Model.add(lay.Dense(units=i,activation=self.Activation))
-            self.Model.add(lay.Dense(units=self.Env.nAction, activation=getattr(act,'linear')))
-        
+                self.Model.add(lay.Dense(units=i,
+                                        activation=self.Activation))
+            self.Model.add(lay.Dense(units=self.Env.nAction,
+                                    activation=getattr(act, 'linear')))
     def CompileModel(self,
                      Optimizer:str='Adam',
                      Loss:str='MSE'):
@@ -63,22 +97,21 @@ class SnakeAgent:
                                      momentum=0.9)
         elif Optimizer == 'rmsprop':
             self.Optimizer = opt.RMSprop(learning_rate=self.LR)
-        elif Loss in ['mse','mean squared error','mean_squared_error']:
+        if Loss in ['mse', 'mean squared error', 'mean_squared_error']:
             self.Loss = los.MeanSquaredError()
-        elif Loss in ['mae','mean absolute error','mean_absolute_error']:
+        elif Loss in ['mae', 'mean absolute error', 'mean_absolute_error']:
             self.Loss = los.MeanAbsoluteError()
         elif Loss in 'huber':
             self.Loss = los.Huber()
         self.Model.compile(optimizer=self.Optimizer,
                            loss=self.Loss)
-    
     def SummaryModel(self):
         print(60 * '_')
-        print('Model Summary')
+        print('Model Sumary: ')
         self.Model.summary()
         print(60 * '_')
     def SaveModel(self):
-        self.Model.save(filepath='Model')
+        self.Model.save(filepath='Model.keras')
         print('Model Saved Succesfully.')
     def PredictQ(self,
                  X:np.ndarray) -> np.ndarray:
@@ -206,72 +239,175 @@ class SnakeAgent:
         if self.SaveOnCounter == self.SaveOn:
             self.SaveModel()
             self.SaveOnCounter = 0
-        def Do(self,
+    def Do(self,
            Action:int) -> tuple[float,
                                 np.ndarray,
                                 bool]:
-            Reward = 0
-            Done = False
-            h0, w0 = self.Env.Head
-            dh, dw = self.Env.Code2Trans[Action]
-            h, w = h0 + dh, w0 + dw
-            Distance1 = np.linalg.norm(self.Env.Head - self.Env.Food, ord=2)
-            if (0 <= h < self.Env.H) and (0 <= w < self.Env.W):
-                if len(self.Env.Snake) == 0:
-                    if self.Env.Map[h, w] == self.Env.Object2Code['Free']:
-                        self.Env.Head = np.array([h, w])
-                        self.Env.Map[h0, w0] = self.Env.Object2Code['Free']
-                        self.Env.Map[h, w] = self.Env.Object2Code['Head']
-                        Distance2 = np.linalg.norm(self.Env.Head - self.Env.Food, ord=2)
-                        if Distance2 < Distance1:
-                            print('Free +')
-                            Reward += self.Env.Rewards['Closer']
-                        else:
-                            print('Free -')
-                            Reward -= self.Env.Rewards['Closer']
-                    elif self.Env.Map[h, w] == self.Env.Object2Code['Food']:
-                        print('Food')
-                        self.Env.Head = np.array([h, w])
-                        self.Env.Map[h, w] = self.Env.Object2Code['Head']
-                        self.Env.Map[h0, w0] = self.Env.Object2Code['Snake']
-                        self.Env.Snake.append(np.array([h0, w0]))
-                        self.Env.ResetFood()
+        Reward = 0
+        Done = False
+        h0, w0 = self.Env.Head
+        dh, dw = self.Env.Code2Trans[Action]
+        h, w = h0 + dh, w0 + dw
+        Distance1 = np.linalg.norm(self.Env.Head - self.Env.Food, ord=2)
+        if (0 <= h < self.Env.H) and (0 <= w < self.Env.W):
+            if len(self.Env.Snake) == 0:
+                if self.Env.Map[h, w] == self.Env.Object2Code['Free']:
+                    self.Env.Head = np.array([h, w])
+                    self.Env.Map[h0, w0] = self.Env.Object2Code['Free']
+                    self.Env.Map[h, w] = self.Env.Object2Code['Head']
+                    Distance2 = np.linalg.norm(self.Env.Head - self.Env.Food, ord=2)
+                    if Distance2 < Distance1:
+                        print('Free +')
                         Reward += self.Env.Rewards['Closer']
-                        Reward += self.Env.Rewards['Food']
-                else:
-                    if self.Env.Map[h, w] == self.Env.Object2Code['Free']:
-                        self.Env.Map[h, w] = self.Env.Object2Code['Head']
-                        self.Env.Map[h0, w0] = self.Env.Object2Code['Snake']
-                        self.Env.Map[self.Env.Snake[-1][0], self.Env.Snake[-1][1]] = self.Env.Object2Code['Free']
-                        self.Env.Head = np.array([h, w])
-                        self.Env.Snake = [np.array([h0, w0])] + self.Env.Snake[:-1]
-                        Distance2 = np.linalg.norm(self.Env.Head - self.Env.Food, ord=2)
-                        if Distance2 < Distance1:
-                            print('Free +')
-                            Reward += self.Env.Rewards['Closer']
-                        else:
-                            print('Free -')
-                            Reward -= self.Env.Rewards['Closer']
-                    elif self.Env.Map[h, w] == self.Env.Object2Code['Snake']:
-                        if (np.array([h, w]) == self.Env.Snake[0]).all():
-                            print('Reverse')
-                            Reward += self.Env.Rewards['Reverse']
-                        else:
-                            print('Snake')
-                            Reward += self.Env.Rewards['Snake']
-                            Done = True
-                    elif self.Env.Map[h, w] == self.Env.Object2Code['Food']:
-                        print('Food')
-                        self.Env.Map[h, w] = self.Env.Object2Code['Head']
-                        self.Env.Map[h0, w0] = self.Env.Object2Code['Snake']
-                        self.Env.Head = np.array([h, w])
-                        self.Env.Snake = [np.array([h0, w0])] + self.Env.Snake
-                        self.Env.ResetFood()
-                        Reward += self.Env.Rewards['Closer']
-                        Reward += self.Env.Rewards['Food']
+                    else:
+                        print('Free -')
+                        Reward -= self.Env.Rewards['Closer']
+                elif self.Env.Map[h, w] == self.Env.Object2Code['Food']:
+                    print('Food')
+                    self.Env.Head = np.array([h, w])
+                    self.Env.Map[h, w] = self.Env.Object2Code['Head']
+                    self.Env.Map[h0, w0] = self.Env.Object2Code['Snake']
+                    self.Env.Snake.append(np.array([h0, w0]))
+                    self.Env.ResetFood()
+                    Reward += self.Env.Rewards['Closer']
+                    Reward += self.Env.Rewards['Food']
             else:
-                print('Out')
-                Reward += self.Env.Rewards['Out']
-                Done = True
-            State2 = self.GetState()
-            return Reward, State2, Done
+                if self.Env.Map[h, w] == self.Env.Object2Code['Free']:
+                    self.Env.Map[h, w] = self.Env.Object2Code['Head']
+                    self.Env.Map[h0, w0] = self.Env.Object2Code['Snake']
+                    self.Env.Map[self.Env.Snake[-1][0], self.Env.Snake[-1][1]] = self.Env.Object2Code['Free']
+                    self.Env.Head = np.array([h, w])
+                    self.Env.Snake = [np.array([h0, w0])] + self.Env.Snake[:-1]
+                    Distance2 = np.linalg.norm(self.Env.Head - self.Env.Food, ord=2)
+                    if Distance2 < Distance1:
+                        print('Free +')
+                        Reward += self.Env.Rewards['Closer']
+                    else:
+                        print('Free -')
+                        Reward -= self.Env.Rewards['Closer']
+                elif self.Env.Map[h, w] == self.Env.Object2Code['Snake']:
+                    if (np.array([h, w]) == self.Env.Snake[0]).all():
+                        print('Reverse')
+                        Reward += self.Env.Rewards['Reverse']
+                    else:
+                        print('Snake')
+                        Reward += self.Env.Rewards['Snake']
+                        Done = True
+                elif self.Env.Map[h, w] == self.Env.Object2Code['Food']:
+                    print('Food')
+                    self.Env.Map[h, w] = self.Env.Object2Code['Head']
+                    self.Env.Map[h0, w0] = self.Env.Object2Code['Snake']
+                    self.Env.Head = np.array([h, w])
+                    self.Env.Snake = [np.array([h0, w0])] + self.Env.Snake
+                    self.Env.ResetFood()
+                    Reward += self.Env.Rewards['Closer']
+                    Reward += self.Env.Rewards['Food']
+        else:
+            print('Out')
+            Reward += self.Env.Rewards['Out']
+            Done = True
+        State2 = self.GetState()
+        return Reward, State2, Done
+    def Train(self,
+              Policy:str):
+        self.Training = True
+        for i in range(self.nEpisode):
+            print(60 * '_')
+            self.NextEpisode()
+            print(f'Episode {i + 1}: [Epsilon: {self.Epsilon:.2f}] - [Temperature: {self.Temperature:.2f}]')
+            self.State = self.GetState()
+            while True:
+                self.NextStep()
+                Action = self.Decide(Policy)
+                Reward, State2, Done = self.Do(Action)
+                self.ActionLog.append(Reward)
+                self.EpisodeLog[i] += Reward
+                self.Save2Memory(Action, Reward, State2, Done)
+                self.State = State2
+                if Done or self.Step == self.mStep - 1:
+                    break
+            print(f'Total Reward: {self.EpisodeLog[i]:.0f}')
+        self.ActionLog = np.array(self.ActionLog,
+                                  dtype=np.float16)
+        plt.close()
+        self.Training = False
+        self.SaveModel()
+        self.SaveOnCounter = 0
+    def Test(self,
+             Policy:str,
+             nEpisode:int):
+        self.Epsilon = self.Epsilons[-1]
+        self.Temperature = self.Temperatures[-1]
+        for i in range(nEpisode):
+            print(60 * '_')
+            print(f'Test Episode {i + 1}: [Epsilon: {self.Epsilon:.2f}] - [Temperature: {self.Temperature:.2f}]')
+            self.Step = -1
+            self.Env.Reset()
+            self.State = self.GetState()
+            TotalReward = 0
+            while True:
+                self.NextStep()
+                Action = self.Decide(Policy)
+                Reward, State2, Done = self.Do(Action)
+                TotalReward += Reward
+                self.State = State2
+                if Done or self.Step == self.mStep - 1:
+                    break
+            print(f'Total Reward: {self.EpisodeLog[i]:.0f}')
+        plt.close()
+    def SMA(self,
+            S:np.ndarray,
+            L:int) -> np.ndarray:
+        nD0 = S.size
+        nD = nD0 - L + 1
+        M = np.zeros(shape=(nD, ),
+                     dtype=np.float32)
+        for i in range(nD):
+            M[i] = S[i:i + L].mean()
+        return M
+    def PlotActionLog(self,
+                      L:int):
+        Actions = np.arange(start=1,
+                            stop=self.ActionLog.size + 1,
+                            step=1)
+        M = self.SMA(self.ActionLog, L)
+        plt.plot(Actions,
+                 self.ActionLog,
+                 ls='-',
+                 lw=1,
+                 c='teal',
+                 label='Reward')
+        plt.plot(Actions[-M.size:],
+                 M,
+                 ls='-',
+                 lw=1.2,
+                 c='crimson',
+                 label=f'SMA({L})')
+        plt.title('Agent Actions Reward Over Training Episodes')
+        plt.xlabel('Action')
+        plt.ylabel('Reward')
+        plt.legend()
+        plt.show()
+    def PlotEpisodeLog(self,
+                       L:int):
+        Episodes = np.arange(start=1,
+                             stop=self.EpisodeLog.size + 1,
+                             step=1)
+        M = self.SMA(self.EpisodeLog, L)
+        plt.plot(Episodes,
+                 self.EpisodeLog,
+                 ls='-',
+                 lw=1,
+                 c='teal',
+                 label='Reward')
+        plt.plot(Episodes[-M.size:],
+                 M,
+                 ls='-',
+                 lw=1.2,
+                 c='crimson',
+                 label=f'SMA({L})')
+        plt.title('Agent Episodes Reward Over Training Episodes')
+        plt.xlabel('Episode')
+        plt.ylabel('Reward')
+        plt.legend()
+        plt.show()
