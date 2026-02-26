@@ -222,7 +222,7 @@ class SnakeAgent:
             s1, a, r, s2, done = self.Memory[i]
             X.append(s1)
             q1 = self.PredictQ(s1)
-            if done: # If Final State
+            if done:
                 q1[a] = r
                 Y.append(q1)
             else:
