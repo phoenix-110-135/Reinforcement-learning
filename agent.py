@@ -77,3 +77,15 @@ class SnakeAgent:
         print('Model Summary')
         self.Model.summary()
         print(60 * '_')
+    def SaveModel(self):
+        self.Model.save(filepath='Model')
+        print('Model Saved Succesfully.')
+    def PredictQ(self,
+                 X:np.ndarray) -> np.ndarray:
+        if X.ndim == 1:
+            Q = self.Model.predict(np.expand_dims(X, axis=0),
+                                   verbose=0)[0]
+        else:
+            Q = self.Model.predict(X,
+                                   verbose=0)
+        return Q
