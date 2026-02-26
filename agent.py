@@ -168,3 +168,41 @@ class SnakeAgent:
         plt.xlabel('Episode')
         plt.ylabel('Temperature')
         plt.show()
+    def Save2Memory(self,
+                    Action:int,
+                    Reward:float,
+                    State2:np.ndarray,
+                    Done:bool):
+        self.Memory.append([self.State, Action, Reward, State2, Done])
+        self.Counter += 1
+        if self.Counter == self.TrainOn:
+            self.TrainModel()
+            self.Counter = 0
+    def TrainModel(self):
+        nD = len(self.Memory)
+        Selecteds = np.random.choice(a=nD,
+                                     size=min(nD, self.sBatch),
+                                     replace=False)
+        X = []
+        Y = []
+        for i in Selecteds:
+            s1, a, r, s2, done = self.Memory[i]
+            X.append(s1)
+            q1 = self.PredictQ(s1)
+            if done: # If Final State
+                q1[a] = r
+                Y.append(q1)
+            else:
+                q2 = self.PredictQ(s2)
+                q1[a] = r + self.Gamma * q2.max()
+                Y.append(q1)
+        X = np.array(X, dtype=np.float16)
+        Y = np.array(Y, dtype=np.float16)
+        Y = np.clip(Y, self.MinQ, self.MaxQ)
+        self.Model.train_on_batch(x=X,
+                                  y=Y)
+        print('Model Trained On Batch Succesfully.')
+        self.SaveOnCounter += 1
+        if self.SaveOnCounter == self.SaveOn:
+            self.SaveModel()
+            self.SaveOnCounter = 0
