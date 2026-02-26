@@ -1,3 +1,4 @@
+import os 
 import numpy as np 
 import matplotlib.pyplot
 import tensorflow as tf 
@@ -16,7 +17,9 @@ class SnakeAgent:
                  nEpsilon:int=100,
                  Epsilon1:float=0.99,
                  Epsilon2:float=0.01,
-                 LR:float=1e-3):
+                 LR:float=1e-3,
+                 Save:bool=True,
+                 Load:bool=True):
         self.LR =LR
         self.Hv = Hv
         self.Wv = Wv
@@ -29,6 +32,11 @@ class SnakeAgent:
         self.Epsilons = np.linspace(start=Epsilon1,
                                     stop=Epsilon2,
                                     num=nEpsilon)
+        
+        self.LR = LR
+        self.Save = Save
+        self.Load =Load
+
     def CreateModel(self,
                     nDense:list=[512,256],
                     Activation:str="gelu"):
