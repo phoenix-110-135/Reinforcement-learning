@@ -42,12 +42,15 @@ class SnakeAgent:
                     Activation:str="gelu"):
         self.nDense = nDense
         self.Activation = getattr(act,Activation)
-        self.Model = mod.Sequential()
-        self.Model.add(lay.InputLayer(input_tensor=self.InputShape))
-        for i in nDense:
-            self.Model.add(lay.Dense(units=i,activation=self.Activation))
-        self.Model.add(lay.Dense(units=self.Env.nAction, activation=getattr(act,'linear')))
-    
+        if os.path.exists('Model') and self.Load:
+            self.Model = mod.load_model('Model')
+        else:
+            self.Model = mod.Sequential()
+            self.Model.add(lay.InputLayer(input_tensor=self.InputShape))
+            for i in nDense:
+                self.Model.add(lay.Dense(units=i,activation=self.Activation))
+            self.Model.add(lay.Dense(units=self.Env.nAction, activation=getattr(act,'linear')))
+        
     def CompileModel(self,
                      Optimizer:str='Adam',
                      Loss:str='MSE'):
