@@ -206,3 +206,72 @@ class SnakeAgent:
         if self.SaveOnCounter == self.SaveOn:
             self.SaveModel()
             self.SaveOnCounter = 0
+        def Do(self,
+           Action:int) -> tuple[float,
+                                np.ndarray,
+                                bool]:
+            Reward = 0
+            Done = False
+            h0, w0 = self.Env.Head
+            dh, dw = self.Env.Code2Trans[Action]
+            h, w = h0 + dh, w0 + dw
+            Distance1 = np.linalg.norm(self.Env.Head - self.Env.Food, ord=2)
+            if (0 <= h < self.Env.H) and (0 <= w < self.Env.W):
+                if len(self.Env.Snake) == 0:
+                    if self.Env.Map[h, w] == self.Env.Object2Code['Free']:
+                        self.Env.Head = np.array([h, w])
+                        self.Env.Map[h0, w0] = self.Env.Object2Code['Free']
+                        self.Env.Map[h, w] = self.Env.Object2Code['Head']
+                        Distance2 = np.linalg.norm(self.Env.Head - self.Env.Food, ord=2)
+                        if Distance2 < Distance1:
+                            print('Free +')
+                            Reward += self.Env.Rewards['Closer']
+                        else:
+                            print('Free -')
+                            Reward -= self.Env.Rewards['Closer']
+                    elif self.Env.Map[h, w] == self.Env.Object2Code['Food']:
+                        print('Food')
+                        self.Env.Head = np.array([h, w])
+                        self.Env.Map[h, w] = self.Env.Object2Code['Head']
+                        self.Env.Map[h0, w0] = self.Env.Object2Code['Snake']
+                        self.Env.Snake.append(np.array([h0, w0]))
+                        self.Env.ResetFood()
+                        Reward += self.Env.Rewards['Closer']
+                        Reward += self.Env.Rewards['Food']
+                else:
+                    if self.Env.Map[h, w] == self.Env.Object2Code['Free']:
+                        self.Env.Map[h, w] = self.Env.Object2Code['Head']
+                        self.Env.Map[h0, w0] = self.Env.Object2Code['Snake']
+                        self.Env.Map[self.Env.Snake[-1][0], self.Env.Snake[-1][1]] = self.Env.Object2Code['Free']
+                        self.Env.Head = np.array([h, w])
+                        self.Env.Snake = [np.array([h0, w0])] + self.Env.Snake[:-1]
+                        Distance2 = np.linalg.norm(self.Env.Head - self.Env.Food, ord=2)
+                        if Distance2 < Distance1:
+                            print('Free +')
+                            Reward += self.Env.Rewards['Closer']
+                        else:
+                            print('Free -')
+                            Reward -= self.Env.Rewards['Closer']
+                    elif self.Env.Map[h, w] == self.Env.Object2Code['Snake']:
+                        if (np.array([h, w]) == self.Env.Snake[0]).all():
+                            print('Reverse')
+                            Reward += self.Env.Rewards['Reverse']
+                        else:
+                            print('Snake')
+                            Reward += self.Env.Rewards['Snake']
+                            Done = True
+                    elif self.Env.Map[h, w] == self.Env.Object2Code['Food']:
+                        print('Food')
+                        self.Env.Map[h, w] = self.Env.Object2Code['Head']
+                        self.Env.Map[h0, w0] = self.Env.Object2Code['Snake']
+                        self.Env.Head = np.array([h, w])
+                        self.Env.Snake = [np.array([h0, w0])] + self.Env.Snake
+                        self.Env.ResetFood()
+                        Reward += self.Env.Rewards['Closer']
+                        Reward += self.Env.Rewards['Food']
+            else:
+                print('Out')
+                Reward += self.Env.Rewards['Out']
+                Done = True
+            State2 = self.GetState()
+            return Reward, State2, Done
