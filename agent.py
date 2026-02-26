@@ -1,14 +1,14 @@
-import os 
-import numpy as np 
-import matplotlib.pyplot
-import tensorflow as tf 
-import keras.models as mod 
+import os as os
+import Env as env
+import numpy as np
 import tensorflow as tf
-import keras.layers as lay 
-import keras.activations as act 
-import keras.optimizers as opt 
-import keras.losses as los 
-import Env as env 
+import collections as col
+import keras.models as mod
+import keras.layers as lay
+import keras.losses as los
+import keras.optimizers as opt
+import keras.activations as act
+import matplotlib.pyplot as plt
 class SnakeAgent:
     def __init__(self,
                  Hv:int,
@@ -89,3 +89,82 @@ class SnakeAgent:
             Q = self.Model.predict(X,
                                    verbose=0)
         return Q
+    def GetState(self) -> np.ndarray:
+        State = []
+        for i in range(-self.Hv, self.Hv + 1):
+            for j in range(-self.Wv, self.Wv + 1):
+                if i != 0 or j != 0:
+                    x = self.Env.Object2Code['Out']
+                    if (0 <= self.Env.Head[0] + i < self.Env.H) and (0 <= self.Env.Head[1] + j < self.Env.W):
+                        x = self.Env.Map[self.Env.Head[0] + i, self.Env.Head[1] + j]
+                    for k in self.Env.t1:
+                        if x == k:
+                            State.append(+1)
+                        else:
+                            State.append(-1)
+        State.append(2 * self.Env.Head[0] / (self.Env.H - 1) - 1)
+        State.append(2 * self.Env.Head[1] / (self.Env.W - 1) - 1)
+        State.append(2 * self.Env.Food[0] / (self.Env.H - 1) - 1)
+        State.append(2 * self.Env.Food[1] / (self.Env.W - 1) - 1)
+        State = np.array(State)
+        return State
+    def Decide(self,
+               Policy:str) -> int:
+        if Policy == 'R':
+            Action = np.random.randint(low=0,
+                                       high=self.Env.nAction)
+        elif Policy == 'G':
+            Q = self.PredictQ(self.State)
+            Action = np.argmax(Q)
+        elif Policy == 'EG':
+            r = np.random.rand()
+            if r < self.Epsilon:
+                Action = self.Decide('R')
+            else:
+                Action = self.Decide('G')
+        elif Policy == 'B':
+            Q = self.PredictQ(self.State)
+            Q = Q / self.Temperature
+            Q[Q > 20] = 20
+            Q = np.exp(Q)
+            P = Q / Q.sum()
+            Action = np.random.choice(a=self.Env.nAction, p=P)
+        return Action
+    def NextEpisode(self):
+        self.Episode += 1
+        self.Step = -1
+        self.Epsilon = self.Epsilons[self.Episode]
+        self.Temperature = self.Temperatures[self.Episode]
+        self.Env.Reset()
+    def NextStep(self):
+        self.Step += 1
+        if self.Training and self.trShow:
+            self.Env.OnlineShow()
+        elif not self.Training and self.teShow:
+            self.Env.OnlineShow()
+    def PlotEpsilons(self):
+        Episodes = np.arange(start=1,
+                             stop=self.nEpisode + 1,
+                             step=1)
+        plt.plot(Episodes,
+                 self.Epsilons,
+                 ls='-',
+                 lw=1,
+                 c='crimson')
+        plt.title('Epsilon Value Over Training Episodes')
+        plt.xlabel('Episode')
+        plt.ylabel('Epsilon')
+        plt.show()
+    def PlotTemperatures(self):
+        Episodes = np.arange(start=1,
+                             stop=self.nEpisode + 1,
+                             step=1)
+        plt.plot(Episodes,
+                 self.Temperatures,
+                 ls='-',
+                 lw=1,
+                 c='crimson')
+        plt.title('Temperature Value Over Training Episodes')
+        plt.xlabel('Episode')
+        plt.ylabel('Temperature')
+        plt.show()
